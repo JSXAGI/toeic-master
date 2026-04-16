@@ -1,0 +1,22 @@
+{
+  "short_name": "TOEIC Master",
+  "name": "TOEIC® Master 300+ Premium",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://via.placeholder.com/512",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "index.html",
+  "background_color": "#183DB2",
+  "display": "standalone",
+  "scope": "./",
+  "theme_color": "#183DB2",
+  "description": "TOEIC practice application with 350+ questions."
+}

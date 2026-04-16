@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ja" style="height: 100%;">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOEIC® Master Premium</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="box">
+    <div id="home-btn" class="home-icon" onclick="backToHome()">🏠</div>
+
+    <div id="start-screen">
+        <h1>TOEIC® Master 300+</h1>
+        <button class="mode-btn btn-all" onclick="startQuiz('ALL')">全レベル挑戦</button>
+        <button class="mode-btn btn-beg" onclick="startQuiz('Beginner')">初級 (Beginner)</button>
+        <button class="mode-btn btn-int" onclick="startQuiz('Intermediate')">中級 (Intermediate)</button>
+        <button class="mode-btn btn-adv" onclick="startQuiz('Advanced')">上級 (Advanced)</button>
+        <button class="mode-btn btn-sa"  onclick="startQuiz('SA')">最上級 (Super Advanced)</button>
+        
+        <div id="review-btn-container" style="display:none;">
+            <button class="mode-btn btn-rev" onclick="startQuiz('REVIEW')">苦手克服モード</button>
+        </div>
+<div class="system-guide">
+            <strong>【System Guide】</strong><br>
+            ・出題順：各レベル内で毎回ランダムにシャッフルされます。<br>
+            ・選択肢：(A)〜(D)の配置は毎回ランダムに入れ替わります。<br>
+            ・制限時間：初級(60秒) / 中・上級(45秒) / 最上級(30秒)に自動設定。<br>
+            ・学習記録：間違えた問題はブラウザに自動保存されます。
+</div>
+
+        <div class="reset-area">
+            <div id="mistake-display">現在の苦手登録数: 0件</div>
+            <button class="reset-btn" onclick="clearStorage()">学習履歴をリセット</button>
+        </div>
+    </div>
+
+    <div id="quiz-screen" style="display:none;">
+        <div id="timer-container">
+            <div id="timer-bar"></div>
+        </div>
+
+        <div id="question-id"></div>
+        <div id="question-text"></div>
+        <div id="choices-container"></div>
+        
+        <div id="feedback-area">
+            <h2 id="result-label" style="margin-top:0;"></h2>
+            <p id="explanation-text" style="text-align:left;"></p>
+            <button class="next-btn" onclick="nextQuestion()">Next Question</button>
+        </div>
+    </div>
+</div>
+
+<script src="data.js"></script>
+
+<script>
+    let currentSessionQuestions = [];
+    let currentIndex = 0;
+    let currentCorrectIndexInDisplay = 0;
+    let timerInterval;
+    let TIME_LIMIT;
+
+    let mistakeIDs = new Set(JSON.parse(localStorage.getItem('toeic_mistakes')) || []);
+
+    window.onload = function() {
+        updateMistakeDisplay();
+    };
+
+    function updateMistakeDisplay() {
+        const count = mistakeIDs.size;
+        document.getElementById('mistake-display').innerText = `現在の苦手登録数: ${count}件`;
+        document.getElementById('review-btn-container').style.display = (count > 0) ? 'block' : 'none';
+    }
+
+    function clearStorage() {
+        if (confirm("保存されているデータをすべて削除しますか？")) {
+            mistakeIDs.clear();
+            localStorage.removeItem('toeic_mistakes');
+            updateMistakeDisplay();
+            alert("リセット完了しました。");
+        }
+    }
+
+    // --- タイマー制御 ---
+    function startTimer() {
+        let timeLeft = TIME_LIMIT;
+        const bar = document.getElementById('timer-bar');
+        const container = document.getElementById('timer-container');
+        
+        container.style.display = 'block';
+        bar.style.width = '100%';
+
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft -= 0.1;
+            const percentage = (timeLeft / TIME_LIMIT) * 100;
+            bar.style.width = percentage + '%';
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                autoWrong(); 
+            }
+        }, 100);
+    }
+
+    function autoWrong() {
+        checkAnswer(-1); 
+        document.getElementById('result-label').innerText = "Time Up! (時間切れ)";
+    }
+
+    // --- クイズ制御 ---
+function startQuiz(mode) {
+    // --- 追加：モードによって制限時間を変える ---
+    if (mode === 'Beginner') {
+        TIME_LIMIT = 60; // 初級はゆったり60秒
+    } else if (mode === 'SA') {
+        TIME_LIMIT = 30; // 最上級は少しタイトに30秒
+    } else {
+        TIME_LIMIT = 45; // その他（中級・上級・全レベル等）は45秒
+    }
+    // ---------------------------------------
+
+    if (mode === 'REVIEW') {
+        currentSessionQuestions = allQuestions.filter(q => mistakeIDs.has(q.id));
+    } else {
+        currentSessionQuestions = (mode === 'ALL') 
+            ? [...allQuestions] 
+            : allQuestions.filter(q => q.level === mode);
+    }
+
+    if (currentSessionQuestions.length === 0) {
+        alert("問題がありません。");
+        return;
+    }
+
+    currentSessionQuestions.sort(() => Math.random() - 0.5);
+    currentIndex = 0;
+    
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('quiz-screen').style.display = 'block';
+    document.getElementById('home-btn').style.display = 'block';
+    renderQuestion();
+}
+
+    function renderQuestion() {
+        const data = currentSessionQuestions[currentIndex];
+        
+        startTimer();
+
+        document.getElementById('question-id').innerText = `ID: ${data.id} (Q ${currentIndex + 1}/${currentSessionQuestions.length})`;
+        document.getElementById('question-text').innerText = data.q;
+        
+        const container = document.getElementById('choices-container');
+        container.innerHTML = '';
+        document.getElementById('feedback-area').style.display = 'none';
+        
+        const originalOptions = data.options;
+        const originalCorrectText = originalOptions[data.correct];
+        const shuffledOptions = [...originalOptions].sort(() => Math.random() - 0.5);
+        currentCorrectIndexInDisplay = shuffledOptions.indexOf(originalCorrectText);
+        
+        const labels = ['(A)', '(B)', '(C)', '(D)'];
+        shuffledOptions.forEach((opt, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'choice-btn';
+            btn.setAttribute('data-label', labels[index]);
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(index);
+            container.appendChild(btn);
+        });
+    }
+
+    function checkAnswer(selected) {
+        clearInterval(timerInterval);
+        document.getElementById('timer-container').style.display = 'none';
+
+        const data = currentSessionQuestions[currentIndex];
+        const feedback = document.getElementById('feedback-area');
+        feedback.style.display = 'block';
+        
+        const buttons = document.querySelectorAll('.choice-btn');
+        buttons.forEach(b => b.disabled = true);
+
+        if (selected === currentCorrectIndexInDisplay) {
+            feedback.className = 'correct';
+            document.getElementById('result-label').innerText = "Correct! (正解)";
+        } else {
+            feedback.className = 'wrong';
+            const label = ['(A)', '(B)', '(C)', '(D)'][currentCorrectIndexInDisplay];
+            if (selected !== -1) {
+                document.getElementById('result-label').innerText = `Incorrect (正解: ${label})`;
+            }
+            
+            mistakeIDs.add(data.id);
+            localStorage.setItem('toeic_mistakes', JSON.stringify([...mistakeIDs]));
+        }
+        document.getElementById('explanation-text').innerText = data.explanation;
+        updateMistakeDisplay();
+    }
+
+    function nextQuestion() {
+        currentIndex++;
+        if (currentIndex < currentSessionQuestions.length) {
+            renderQuestion();
+        } else {
+            alert("セッション終了！ホームに戻ります。");
+            backToHome();
+        }
+    }
+
+function backToHome() {
+        clearInterval(timerInterval);
+        document.getElementById('start-screen').style.display = 'block';
+        document.getElementById('quiz-screen').style.display = 'none';
+        document.getElementById('home-btn').style.display = 'none';
+        updateMistakeDisplay();
+    }
+
+    // 同じscriptタグの中に続けて書いてもOK
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Service Worker registered!'))
+                .catch(err => console.log('Service Worker registration failed:', err));
+        });
+    }
+</script>
+</body>
+</html>
