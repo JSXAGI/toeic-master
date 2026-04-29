@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TOEIC® Master Premium</title>
 <link rel="stylesheet" href="style.css">
-<link rel="manifest" href="manifest.json">    
+<link rel="manifest" href="manifest.json">
 </head>
 <body>
 
@@ -173,35 +173,65 @@ function startQuiz(mode) {
         });
     }
 
-    function checkAnswer(selected) {
-        clearInterval(timerInterval);
-        document.getElementById('timer-container').style.display = 'none';
 
-        const data = currentSessionQuestions[currentIndex];
-        const feedback = document.getElementById('feedback-area');
-        feedback.style.display = 'block';
+// 読み上げ用の関数を追加
+function speakText(text) {
+    // 以前の読み上げを停止
+    window.speechSynthesis.cancel();
+    const uttr = new SpeechSynthesisUtterance(text);
+    uttr.lang = 'en-US'; // 英語で読み上げ
+    uttr.rate = 0.9;     // 少しゆっくりめ
+    window.speechSynthesis.speak(uttr);
+}
+
+// checkAnswer 関数を修正
+// checkAnswer 関数を修正
+function checkAnswer(selected) {
+    // 回答した瞬間にタイマーを止める
+    clearInterval(timerInterval);
+
+    const data = currentSessionQuestions[currentIndex];
+    const feedbackArea = document.getElementById('feedback-area');
+    feedbackArea.style.display = 'block';
+
+    // 虫食い部分「-------」を正解の選択肢に置換した文章を作成
+    const correctWord = data.options[data.correct];
+    const fullSentence = data.q.replace(/-------/g, correctWord);
+
+    // 正解判定 (表示上のインデックス currentCorrectIndexInDisplay と比較)
+    if (selected === currentCorrectIndexInDisplay) {
+        // --- 正解時 ---
+        document.getElementById('result-label').innerText = "Correct!";
+        document.getElementById('result-label').style.color = "#28a745";
+        feedbackArea.className = 'correct'; 
+    } else {
+        // --- 不正解・タイムアップ時 ---
+        feedbackArea.className = 'wrong';
+        const label = ['(A)', '(B)', '(C)', '(D)'][currentCorrectIndexInDisplay];
         
-        const buttons = document.querySelectorAll('.choice-btn');
-        buttons.forEach(b => b.disabled = true);
-
-        if (selected === currentCorrectIndexInDisplay) {
-            feedback.className = 'correct';
-            document.getElementById('result-label').innerText = "Correct! (正解)";
+        if (selected === -1) {
+            document.getElementById('result-label').innerText = `Time Up! (正解: ${label})`;
         } else {
-            feedback.className = 'wrong';
-            const label = ['(A)', '(B)', '(C)', '(D)'][currentCorrectIndexInDisplay];
-            if (selected !== -1) {
-                document.getElementById('result-label').innerText = `Incorrect (正解: ${label})`;
-            }
-            
-            mistakeIDs.add(data.id);
-            localStorage.setItem('toeic_mistakes', JSON.stringify([...mistakeIDs]));
+            document.getElementById('result-label').innerText = `Incorrect (正解: ${label})`;
         }
-        document.getElementById('explanation-text').innerText = data.explanation;
-        updateMistakeDisplay();
+        document.getElementById('result-label').style.color = "#dc3545";
+
+        // 苦手リストに追加
+        mistakeIDs.add(data.id);
+        localStorage.setItem('toeic_mistakes', JSON.stringify([...mistakeIDs]));
     }
 
+    // 正解・不正解に関わらず「完成した文章」を提示して読み上げる
+    document.getElementById('explanation-text').innerHTML = 
+        `<strong style="color:#183DB2; display:block; margin-bottom:10px; font-size:1.1em;">${fullSentence}</strong>` + 
+        `<div style="color:#333;">${data.explanation}</div>`;
+        
+    speakText(fullSentence); // 読み上げ実行
+    updateMistakeDisplay();
+}
+
     function nextQuestion() {
+	    window.speechSynthesis.cancel(); // ← これを追加！
         currentIndex++;
         if (currentIndex < currentSessionQuestions.length) {
             renderQuestion();
@@ -212,6 +242,7 @@ function startQuiz(mode) {
     }
 
 function backToHome() {
+        window.speechSynthesis.cancel(); // ← これを追加！
         clearInterval(timerInterval);
         document.getElementById('start-screen').style.display = 'block';
         document.getElementById('quiz-screen').style.display = 'none';
