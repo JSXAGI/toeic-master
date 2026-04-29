@@ -113,6 +113,9 @@
 
     // --- クイズ制御 ---
 function startQuiz(mode) {
+    // ブラウザの音声再生をアンロックするための空読み
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+	
     // --- 追加：モードによって制限時間を変える ---
     if (mode === 'Beginner') {
         TIME_LIMIT = 60; // 初級はゆったり60秒
