@@ -1,5 +1,5 @@
 // sw.js
-const CACHE_NAME = 'toeic-master-v1';
+const CACHE_NAME = 'toeic-master-v2';
 const urlsToCache = [
   './',
   './index.html',
